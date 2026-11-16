@@ -7,7 +7,11 @@ const userSchema = new mongoose.Schema(
     email: { type: String, default: '' },
     avatarUrl: { type: String, default: '' },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    // Jangan kirim field internal MongoDB (_id, __v) ke client.
+    toJSON: { versionKey: false, transform: (_doc, ret) => { delete ret._id; return ret; } },
+  }
 );
 
 export const User = mongoose.model('User', userSchema);

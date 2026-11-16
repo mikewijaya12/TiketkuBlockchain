@@ -3,13 +3,20 @@ import { env } from '../config/env.js';
 import { isAdmin, isOrganizer } from '../config/chain.js';
 import { wrap } from './util.js';
 
+const ADDRESS_RE = /^0x[0-9a-f]{40}$/;
+
 export function requireAuth(req, res, next) {
   const [type, token] = (req.headers.authorization || '').split(' ');
   if (type !== 'Bearer' || !token) {
     return res.status(401).json({ error: 'Token diperlukan' });
   }
   try {
-    const payload = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] });
+    const payload = jwt.verify(token, env.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: env.jwtIssuer,
+      audience: env.jwtAudience,
+    });
+    if (typeof payload.sub !== 'string' || !ADDRESS_RE.test(payload.sub)) throw new Error('sub');
     // Alamat SELALU dari JWT, bukan dari body/URL (mencegah IDOR).
     req.user = { address: payload.sub };
     next();

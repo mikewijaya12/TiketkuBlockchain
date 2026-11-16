@@ -17,3 +17,13 @@ out/
 # Hardhat
 artifacts/
 cache/
+
+# Template env frontend tetap ikut di-push
+!.env.local.example
+
+# Catatan audit internal (simpan lokal, jangan di-push)
+docs/audit/
+
+# Build TypeScript
+*.tsbuildinfo
+next-env.d.ts

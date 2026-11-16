@@ -1,134 +1,95 @@
-@ -0,0 +1,111 @@
 # TiketKu
-1. **Smart‑contract development**
-   - Finalise all contract functions (event lifecycle, resale, check‑in, refunds).
-   - Write exhaustive Hardhat tests and run Slither analysis.
-   - Deploy script & CI pipeline.
 
-2. **Backend API development**
-   - Implement SIWE authentication, JWT middleware, and role verification.
-   - Build CRUD endpoints for events, tickets, and organizer applications.
-   - Add MongoDB schemas and validation.
+TiketKu adalah dApp tiket event berbasis Ethereum (Sepolia) yang mencegah tiket palsu, calo,
+transfer tidak resmi, dan check-in ganda. Setiap tiket adalah NFT ERC-721 yang hanya bisa
+berpindah lewat resale resmi dengan harga maksimum 110% dari harga asli.
 
-3. **Frontend UI development**
-   - Scaffold Next.js pages (Landing, Login, Dashboard, Organizer, Admin, Gate Staff).
-   - Integrate ethers.js v6 for contract interactions.
-   - Implement QR‑code generation & verification flow.
+Proyek mini COMP6873001 Blockchain Fundamental, BINUS University.
 
-4. **DevOps / CI‑CD & deployment**
-   - Set up GitHub Actions workflows: lint, test, build, and deploy to Vercel/Netlify.
-   - Configure environment variables for Sepolia, MongoDB Atlas, and JWT.
-   - Automate contract verification on Etherscan.
+## Struktur repo
 
-5. **Security & testing**
-   - Run static analysis (Slither, MythX) on contracts.
-   - Perform penetration testing on the backend (OWASP checks).
-   - Add end‑to‑end tests for the full dApp flow.
-[![Build Status](https://github.com/SaMuEl-Primo/TiketKu/actions/workflows/ci.yml/badge.svg)](https://github.com/SaMuEl-Primo/TiketKu/actions)
-[![Coverage Status](https://coveralls.io/repos/github/SaMuEl-Primo/TiketKu/badge.svg?branch=main)](https://coveralls.io/github/SaMuEl-Primo/TiketKu?branch=main)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+| Folder | Isi |
+|---|---|
+| `ticket-chain/` | Smart contract `EventTicket.sol` (Hardhat), test, script deploy, laporan Slither |
+| `backend/` | API Express + MongoDB: login wallet (SIWE + JWT), data off-chain (profil, detail event, poster, pengajuan EO) |
+| `frontend/` | Next.js 14 + ethers v6: halaman pembeli, Dashboard EO, Gate scanner, Panel Admin |
+| `docs/` | Panduan integrasi frontend |
 
-## Project overview
-TiketKu is a decentralized event‑ticketing dApp built on Ethereum Sepolia. It prevents counterfeiting, scalping, unauthorized transfers, and duplicate check‑ins through an on‑chain ERC‑721 ticket system.
+## Arsitektur
 
-## Architecture diagram
 ```mermaid
-flowchart TD
-    subgraph Contract
-        C[TiketKu.sol]
-    end
-    subgraph Backend
-        B[Express API]
-        DB[(MongoDB Atlas)]
-        SI[SIWE Auth]
-    end
-    subgraph Frontend
-        F[Next.js (TS)]
-        M[MetaMask]
-    end
-    C --> B
-    B --> DB
-    B --> SI
-    F --> M
-    F --> B
+flowchart LR
+    U[User + MetaMask] --> F[Frontend Next.js]
+    F -- tx: beli, resale, refund, check-in --> C[EventTicket.sol di Sepolia]
+    F -- REST + JWT --> B[Backend Express]
+    B -- baca role & pemilik event --> C
+    B --> DB[(MongoDB Atlas)]
 ```
 
-## Installation & setup
-```bash
-# Clone repo
-git clone https://github.com/SaMuEl-Primo/TiketKu.git
-cd TiketKu
+- **On-chain**: event (create, read, update, delete), tiket NFT, resale, escrow dana, refund, check-in.
+- **Off-chain**: profil user, deskripsi/lokasi/poster event, pengajuan menjadi Event Organizer.
+- **Role** (selalu dibaca dari kontrak): Admin, Event Organizer, Gate Staff, Buyer.
 
-# Install all workspaces
-npm run install-all   # installs contracts, backend, frontend
-```
+## Menjalankan secara lokal
 
-### Contracts
 ```bash
-cd contracts
-npm install
-npx hardhat compile
-```
+npm install                       # install workspace ticket-chain + backend
 
-### Backend
-```bash
+# 1. Blockchain lokal + deploy kontrak
+cd ticket-chain
+npx hardhat node                  # terminal 1
+npm run deploy:local              # terminal 2, alamat tersimpan di deployments/localhost.json
+
+# 2. Backend
 cd ../backend
-cp .env.example .env   # fill in MONGODB_URI, JWT_SECRET, RPC_URL
-npm install
-npm run dev   # starts Express server
-```
+cp .env.example .env              # isi MONGODB_URI, JWT_SECRET, CONTRACT_ADDRESS, RPC_URL=http://127.0.0.1:8545, CHAIN_ID=31337
+npm run dev
+npm run test:login                # terminal lain: cek login & keamanan dasar
 
-### Frontend
-```bash
+# 3. Frontend
 cd ../frontend
-cp .env.example .env   # set NEXT_PUBLIC_RPC_URL, CONTRACT_ADDRESS
+cp .env.local.example .env.local  # NEXT_PUBLIC_CONTRACT_ADDRESS dari deployments/localhost.json
 npm install
-npm run dev   # starts Next.js dev server
+npm run dev                       # http://localhost:3000
 ```
 
-## Usage examples
-- **Deploy contract**:
-  ```bash
-  cd contracts
-  npx hardhat run scripts/deploy.js --network sepolia
-  ```
-- **Create an event (via backend)**:
-  ```http
-  POST /api/events
-  {
-    "metadataURI": "ipfs://Qm...",
-    "price": "0.01",
-    "maxSupply": 100,
-    "maxPerWallet": 5,
-    "maxResalePrice": "0.05",
-    "eventDate": 1735689600
-  }
-  ```
-- **Buy a ticket (frontend)**: Connect MetaMask, select an event, click *Buy* – transaction is sent to the contract.
+Deploy ke Sepolia: lihat `ticket-chain/README.md`.
 
-## Testing instructions
+## Testing
+
 ```bash
-# Contract unit tests
-cd contracts
-npm test
-
-# Backend tests (if added later)
-cd ../backend
-npm test
-
-# Frontend tests (React Testing Library / Cypress)
-cd ../frontend
-npm test
+cd ticket-chain
+npm test              # 49 test, termasuk regression test keamanan
+npm run coverage      # 100% statement & line coverage EventTicket.sol
+npm run slither       # hasil di docs/slither-report.md
 ```
 
-## Security notes
-- All state‑changing functions are protected by OpenZeppelin `AccessControl`, `Pausable`, and `ReentrancyGuard`.
-- No secrets are stored in the repo; use `.env` files for private keys, JWT secret, and MongoDB credentials.
-- Follow the **Security** doc in `docs/security.md` for detailed threat model and recommended audits (Slither, MythX, etc.).
+## Ringkasan keamanan
 
-## Contribution guidelines
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feat/your-feature`).
-3. Ensure all tests pass (`npm run test`).
-4. Open a Pull Request with a clear description.
-5. Follow the code style defined in `.eslintrc` (if added) and run `npm run lint` before committing.
+Kontrak:
+- Transfer bebas diblokir (`_update`), tiket hanya berpindah lewat `buyResale`.
+- Harga resale maksimal 110%, batas tiket per wallet (`maxPerWallet`, berlaku juga untuk resale).
+- Penjualan dan resale ditutup saat acara mulai.
+- Dana pembelian primer dan resale ditahan di escrow; baru cair 1 hari setelah acara.
+- Event hanya bisa dibatalkan (organizer atau admin) sampai 6 jam sebelum acara, kecuali admin
+  membatalkan event milik organizer yang role-nya sudah dicabut (selama dana belum diklaim). Jika batal,
+  setiap pembayaran kembali ke pembayarnya: pembeli pertama dapat harga asli, pembeli resale
+  dapat kembali harga resale yang dibayar.
+- Organizer yang role-nya dicabut tidak bisa lagi mengatur event, gate, atau mengklaim dana.
+- Check-in hanya oleh gate yang ditugaskan organizer untuk event itu, dalam jendela waktu acara,
+  dan wajib menyertakan tanda tangan EIP-712 dari pemilik tiket (QR code) yang berlaku maksimal 10 menit.
+- `AccessControl` (admin tidak bisa melepas role sendiri), `ReentrancyGuard`, `Pausable`, pola pull payment.
+- `approve` / `setApprovalForAll` selalu ditolak; pragma dikunci `0.8.24`.
+
+Risiko yang diterima (didokumentasikan):
+- **Sybil**: batas tiket per wallet bisa diakali dengan banyak wallet. Mencegahnya butuh
+  verifikasi identitas (KYC), di luar cakupan dApp ini. Batas resale 110% tetap membuat
+  memborong tiket tidak menguntungkan.
+- **Admin terpusat**: `DEFAULT_ADMIN_ROLE` dipegang satu akun; produksi sebaiknya multisig.
+
+Backend:
+- Login SIWE (EIP-4361), nonce sekali pakai dan tidak bisa ditimpa orang lain.
+- JWT HS256 dengan issuer/audience, alamat user hanya diambil dari JWT.
+- Semua input divalidasi zod `.strict()`, URL hanya `https://`.
+- Upload dicek dari magic bytes, nama acak, dibatasi 20 file/jam per EO.
+- Helmet, CORS terbatas, rate limit, error tidak membocorkan detail.

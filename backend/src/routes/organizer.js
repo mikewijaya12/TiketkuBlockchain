@@ -23,6 +23,11 @@ router.post('/apply', requireAuth, wrap(async (req, res) => {
   if (await isOrganizer(req.user.address)) {
     return res.status(409).json({ error: 'Wallet ini sudah menjadi Event Organizer' });
   }
+  // Keputusan Admin yang sudah "approved" tidak boleh direset jadi "pending" oleh pemohon.
+  const existing = await OrganizerApplication.findOne({ address: req.user.address });
+  if (existing?.status === 'approved') {
+    return res.status(409).json({ error: 'Pengajuan sudah disetujui, tunggu role diberikan Admin' });
+  }
   const application = await OrganizerApplication.findOneAndUpdate(
     { address: req.user.address },
     { $set: { ...data, status: 'pending' } },
@@ -31,10 +36,17 @@ router.post('/apply', requireAuth, wrap(async (req, res) => {
   res.status(201).json(application);
 }));
 
+// Pemohon melihat status pengajuannya sendiri
+router.get('/me', requireAuth, wrap(async (req, res) => {
+  const application = await OrganizerApplication.findOne({ address: req.user.address });
+  if (!application) return res.status(404).json({ error: 'Belum ada pengajuan' });
+  res.json(application);
+}));
+
 // Admin melihat daftar pengajuan
 router.get('/applications', requireAuth, requireAdmin, wrap(async (req, res) => {
   const q = parse(
-    z.object({ status: z.enum(['pending', 'approved', 'rejected']).optional() }),
+    z.object({ status: z.enum(['pending', 'approved', 'rejected']).optional() }).strict(),
     req.query,
     res
   );
@@ -46,7 +58,7 @@ router.get('/applications', requireAuth, requireAdmin, wrap(async (req, res) => 
 // on-chain lewat grantRole(ORGANIZER_ROLE, address) yang dipanggil dari frontend Admin.
 router.patch('/applications/:address', requireAuth, requireAdmin, wrap(async (req, res) => {
   const p = parse(
-    z.object({ address: z.string().refine((a) => ethers.isAddress(a), 'Alamat tidak valid') }),
+    z.object({ address: z.string().refine((a) => ethers.isAddress(a), 'Alamat tidak valid') }).strict(),
     req.params,
     res
   );

@@ -6,6 +6,8 @@ const need = (key) => {
   return value;
 };
 
+const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
+
 export const env = {
   port: Number(process.env.PORT) || 4000,
   mongoUri: need('MONGODB_URI'),
@@ -13,10 +15,22 @@ export const env = {
   rpcUrl: need('RPC_URL'),
   contractAddress: need('CONTRACT_ADDRESS'),
   chainId: Number(process.env.CHAIN_ID) || 11155111,
-  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
-  domain: process.env.APP_DOMAIN || 'localhost:3000',
+  frontendOrigin,
+  domain: process.env.APP_DOMAIN || new URL(frontendOrigin).host,
+  // Jumlah reverse proxy di depan backend (0 = langsung). Penting untuk rate limit per IP.
+  trustProxy: Number(process.env.TRUST_PROXY) || 0,
+  jwtIssuer: 'tiketku-backend',
+  jwtAudience: 'tiketku-frontend',
 };
 
 if (env.jwtSecret.length < 32) {
   throw new Error('JWT_SECRET minimal 32 karakter');
+}
+// Nilai contoh di .env.example sudah publik di GitHub. Kalau dipakai apa adanya,
+// siapa pun bisa memalsukan JWT untuk alamat wallet mana pun (CWE-798).
+if (/GANTI|CHANGE_ME|EXAMPLE/i.test(env.jwtSecret)) {
+  throw new Error('JWT_SECRET masih nilai contoh, ganti dengan string acak (mis. openssl rand -hex 32)');
+}
+if (/^0x0{40}$/i.test(env.contractAddress)) {
+  throw new Error('CONTRACT_ADDRESS masih alamat nol, isi dengan alamat hasil deploy');
 }
